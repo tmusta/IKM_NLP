@@ -2,9 +2,9 @@ IKM_NLP
 
 University of Oulu
 
-Code for the course project of NLP.
+Code for the course project of NLP-course.
 
 Members of the group:
-Niklas Impiö
-Jussi Kurikka
-Toni Musta
+<br>Niklas Impiö
+<br>Jussi Kurikka
+<br>Toni Musta
