@@ -1,0 +1,27 @@
+Project 1: Disambiguation Using WordNet and distance metric 
+
+The project consists in implementing a new scheme of wordsense disambiguation using Python NTLK, wordnet and supervised classification.  
+
+Consider the dataset senseval-2 (http://www.hipposmond.com/senseval2/) for training and testing tasks. This corpus consists of text from a mixture of places, including the British National Corpus and the Penn Treebank portion of the Wall Street Journal. Each word in the corpus is tagged with its part of speech, and the senses of the following target words are also manually annotated: the nouns interest, line; the verb serve and the adjective hard. The set of senses that are used to annotate each target word come from WordNet. You can list the set of target words for the senseval-2 corpus by running >>senseval.fileids() with NLTK after importing the dataset or use the program given to you. 
+
+Study the program for wordsense disambiguation given in https://www.inf.ed.ac.uk/teaching/courses/fnlp/Tutorials/7_WSD/tutorial.html. The program would allow you to perform disambiguation task on senseeval-2 using Naives Bayes classifier on senseval-2 dataset. It also allows you to assess the performance of the disambiguation task using confusion matrix. 
+
+1.    Comprehend the code, Test the program and Make sure it is working correctly in your configuration. Try to test various choice of pre-processing (with or without stopword, stemming), choice of the proportion of training and testing data employed and report the impact on the confusion matrix.  
+
+2.    Add into the program other performance metric (accuracy, F1 score, precision and recall). 
+
+    Re-run the program when using other classifiers (Random Forest, SVM and Decision Tree) and compare the performance of each classifier in terms of F1-score, accuracy, precision and recall.  
+
+3.    Study also the influence of preprocessing stage by reporting the performance metrics with/without stopword, Stemmer, removing symbols, uncommon characters, etc. Summarize the results in an appropriate table. 
+
+4.    Test the influence of various features: Number of features employed, tf-idf, 2-gram. Provide a table where the performance of selected classifiers of the above classifiers were compared with respect to features (number and type) accordingly using the configuration of the preprocessing that yields best performance in 4).  
+
+5.    Use the Lesk implementation in NLTK (>>from nltk.wsd import lesk), test for few examples of target words of seneval2 the result you will be getting using Lesk algorithm’s disambiguation and report the result of the disambiguation task on both training and testing dataset. Compare the result with Bayes’ classifier. 
+
+6.    We want to expand the Lesk algorithm to include related terms. Start with NLTK WordNet examples to design and implement a program that extract for each sense of the target word, all the information in the synset (word itself, sense and example sentence (s)). Now expand for each term of the example sentence its direct hyponym, direct hypernym, antonym (if available) and any other related terms that can be extracted using WordNet entity relationship. Now construct a large set of each sense of target word that includes all the above. Then perform the simplified Lesk algorithm disambiguation methodology, e.g., count the number of common words between the created enlarged list of each sense and the set of words in the sentence to be disambiguated. 
+
+7.    Compare the results on selected sample of Senseval2 and draw conclusions accordingly. 
+
+8.    Design a simple GUI that allows user to input a target that requires disambiguation and a context (sentence or paragraph where the target word appears) and output the result of the disambiguation task according to simple Lesk and expanded Lesk. 
+
+9.    Design a simple GUI that allows user to input a target that requires disambiguation and a context (sentence or paragraph where the target word appears) and output the result of the disambiguation task according to simple Lesk and expanded Lesk. 
