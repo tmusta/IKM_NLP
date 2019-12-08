@@ -4,6 +4,12 @@ import nltk
 import random
 from nltk.corpus import senseval
 from nltk.classify import accuracy, NaiveBayesClassifier, MaxentClassifier
+from nltk.classify.scikitlearn import SklearnClassifier
+
+from sklearn.svm import LinearSVC
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.tree import DecisionTreeClassifier
+
 from collections import defaultdict
 from wsd_code import senses, sense_instances, STOPWORDS_SET, wsd_context_features, wsd_word_features, extract_vocab_frequency, extract_vocab
 
@@ -99,7 +105,7 @@ def project_classifier(trainer, word, features, stopwords_list = STOPWORDS_SET, 
         derived = [classifier.classify(features(i,vocab)) for (i,label) in test_data]
         cm = nltk.ConfusionMatrix(gold,derived)
         print(cm)
-        return cm
+        #return cm
     if metrics:
         gold = [label for (i, label) in test_data]
         derived = [classifier.classify(features(i,vocab)) for (i,label) in test_data]
@@ -109,11 +115,36 @@ def project_classifier(trainer, word, features, stopwords_list = STOPWORDS_SET, 
             acc = accuracy_per_label(gold, derived, i)
             f1 = f1_score(p, r)
             print(i, " Precision: ", p, " Recall: ", r, " Accuracy: ", acc, " F1-score: ", f1)
+            #print(i, " Precision: %6.4f Recall: %6.4f Accuracy: %6.4f F1-score: %6.4f"%p,r,acc,f1)
 
 if __name__ == "__main__":
     print("NB, with features based on 300 most frequent context words")
-    project_classifier(NaiveBayesClassifier.train, 'hard.pos', wsd_word_features, metrics=True)
+    project_classifier(NaiveBayesClassifier.train, 'hard.pos', wsd_word_features, confusion_matrix=True, metrics=True)
     print("")
     print("NB, with features based word + pos in 6 word window")
-    project_classifier(NaiveBayesClassifier.train, 'hard.pos', wsd_context_features, metrics=True)
+    project_classifier(NaiveBayesClassifier.train, 'hard.pos', wsd_context_features,confusion_matrix=True, metrics=True)
+    print("")
+
+    svc = LinearSVC()
+    print("SVC, with features based on 300 most frequent context words")
+    project_classifier(SklearnClassifier(svc).train, 'hard.pos', wsd_word_features, confusion_matrix=True, metrics=True)
+    print("")
+    print("SVC, with features based word + pos in 6 word window")
+    project_classifier(SklearnClassifier(svc).train, 'hard.pos', wsd_context_features, confusion_matrix=True, metrics=True)
+    print("")
+
+    rfc = RandomForestClassifier()
+    print("RandomForest, with features based on 300 most frequent context words")
+    project_classifier(SklearnClassifier(rfc).train, 'hard.pos', wsd_word_features, confusion_matrix=True, metrics=True)
+    print("")
+    print("RandomForest, with features based word + pos in 6 word window")
+    project_classifier(SklearnClassifier(rfc).train, 'hard.pos', wsd_context_features, confusion_matrix=True, metrics=True)
+    print("")
+
+    dtc = DecisionTreeClassifier()
+    print("DecisionTree, with features based on 300 most frequent context words")
+    project_classifier(SklearnClassifier(dtc).train, 'hard.pos', wsd_word_features, confusion_matrix=True, metrics=True)
+    print("")
+    print("DecisionTree, with features based word + pos in 6 word window")
+    project_classifier(SklearnClassifier(dtc).train, 'hard.pos', wsd_context_features, confusion_matrix=True, metrics=True)
     print("")
