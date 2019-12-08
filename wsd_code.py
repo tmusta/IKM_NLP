@@ -180,13 +180,30 @@ def wst_classifier(trainer, word, features, stopwords_list = STOPWORDS_SET, numb
     that were correctly predicted).
     """
     print("Reading data...")
+    #creates a global variable dictionary for all the different words? e.g. "hard.pos" 
     global _inst_cache
+    #adds words and their instances to said cache.
     if word not in _inst_cache:
         _inst_cache[word] = [(i, i.senses[0]) for i in senseval.instances(word)]
+    # for example _inst_cache["hard.pos"][0] = (SensevalInstance(word='hard-a', position=20, context=[('``', '``'), ('he', 'PRP'), ('may', 'MD'), ('lose', 'VB'), ('all', 'DT'), ('popular', 'JJ'), ('support', 'NN'), (',', ','), ('but', 'CC'), ('someone', 'NN'), ('has', 'VBZ'), ('to', 'TO'), ('kill', 'VB'), ('him', 'PRP'), ('to', 'TO'), ('defeat', 'VB'), ('him', 'PRP'), ('and', 'CC'), ('that', 'DT'), ("'s", 'VBZ'), ('hard', 'JJ'), ('to', 'TO'), ('do', 'VB'), ('.', '.'), ("''", "''")], senses=('HARD1',)), 'HARD1')
+    # the tuple contains the sensevalInstance for the context of the word and the correct label.
+    # it starts with the actual word "hard-a" the following "a" means adjective??? and where the word is located in the following context sentance.
+    # context sentance contains all the words and their tags (verb, adjective, etc.)
+    # Should probably find a cheat sheet for the tags.
+
+    #events[i] == cache[word][i]
     events = _inst_cache[word][:]
+    
+    #senses is a list of all the labels, with the word "hard.pos" senses = ["HARD1", "HARD2", "HARD3"] should probably figure a way to get definitions on these. connect to wordnet???
     senses = list(set(l for (i, l) in events))
+    
+    #intances is a list of the sensevalInstances with the word, position and context info (above).
     instances = [i for (i, l) in events]
+    
+    #vocab collects n most used words from the context sentances into a list. Can be filtered for stopwords.
     vocab = extract_vocab(instances, stopwords=stopwords_list, n=number)
+    #vocab[:5] = ['harder', 'time', 'would', 'get', 'work']
+    
     print(' Senses: ' + ' '.join(senses))
 
     # Split the instances into a training and test set,
@@ -194,15 +211,22 @@ def wst_classifier(trainer, word, features, stopwords_list = STOPWORDS_SET, numb
     n = len(events)
     random.seed(5444522)
     random.shuffle(events)
+    #split the events (sensevalInstance, label) into training and test sets
     training_data = events[:int(0.8 * n)]
     test_data = events[int(0.8 * n):n]
+    
     # Train classifier
     print('Training classifier...')
+    #train the classifier with given classifying function. Defaults to NaiveBayesClassifier.train.
+    #features is a function given for creating the sets. Check out wsd_word_features and wsd_context_features above!
     classifier = trainer([(features(i, vocab, distance), label) for (i, label) in training_data])
+    
     # Test classifier
     print('Testing classifier...')
+    #feeds all the test_data to classifier and compares results.
     acc = accuracy(classifier, [(features(i, vocab, distance), label) for (i, label) in test_data] )
     print('Accuracy: %6.4f' % acc)
+    
     if log==True:
         #write error file
         print('Writing errors to errors.txt')
