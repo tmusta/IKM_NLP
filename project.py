@@ -49,7 +49,7 @@ def f1_score(precision, recall):
     return 2*(precision*recall)/(precision+recall)
 
 ### wsd_classifier() with support for stemming and statistical performance metrics.
-def project_classifier(trainer, word, features, stopwords_list = STOPWORDS_SET, number=300, log=False, distance=3, confusion_matrix=False, metrics = False):
+def project_classifier(trainer, word, features, stopwords_list=STOPWORDS_SET, number=300, log=False, distance=3, confusion_matrix=False, metrics = False):
     print("Reading data...")
     global _inst_cache
     if word not in _inst_cache:
@@ -109,6 +109,7 @@ def project_classifier(trainer, word, features, stopwords_list = STOPWORDS_SET, 
     if metrics:
         gold = [label for (i, label) in test_data]
         derived = [classifier.classify(features(i,vocab)) for (i,label) in test_data]
+        results = {}
         for i in senses:
             p = precision(gold, derived, i)
             r = recall(gold, derived, i)
@@ -116,6 +117,10 @@ def project_classifier(trainer, word, features, stopwords_list = STOPWORDS_SET, 
             f1 = f1_score(p, r)
             print(i, " Precision: ", p, " Recall: ", r, " Accuracy: ", acc, " F1-score: ", f1)
             #print(i, " Precision: %6.4f Recall: %6.4f Accuracy: %6.4f F1-score: %6.4f"%p,r,acc,f1)
+            
+            #added results dict that returns from the function
+            results[i] = {"precision":p,"recall": r,"accuracy": acc,"f1": f1}
+        return results
 
 if __name__ == "__main__":
     print("NB, with features based on 300 most frequent context words")
