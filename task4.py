@@ -46,43 +46,11 @@ def gen_word_dicts(results):
 
     
 
-def no_stops_test(word):
-  #word example = "hard.pos"
-  
-  NB300 = project_classifier(NaiveBayesClassifier.train, word, wsd_word_features, confusion_matrix=True, metrics=True)
-  NB300_NS = project_classifier(NaiveBayesClassifier.train, word, wsd_word_features, stopwords_list=NO_STOPWORDS, confusion_matrix=True, metrics=True)
-
-  NBW6 = project_classifier(NaiveBayesClassifier.train, word, wsd_context_features, stopwords_list=STOPWORDS_SET, confusion_matrix=True, metrics=True)
-  NBW6_NS = project_classifier(NaiveBayesClassifier.train, word, wsd_context_features, stopwords_list=NO_STOPWORDS, confusion_matrix=True, metrics=True)
-
-  svc = LinearSVC()
-  SVC300 = project_classifier(SklearnClassifier(svc).train, word, wsd_word_features, stopwords_list=STOPWORDS_SET,  confusion_matrix=True, metrics=True)
-  SVC300_NS = project_classifier(SklearnClassifier(svc).train, word, wsd_word_features, stopwords_list=NO_STOPWORDS,  confusion_matrix=True, metrics=True)
-  
-  SVCW6  = project_classifier(SklearnClassifier(svc).train, word, wsd_context_features, stopwords_list=STOPWORDS_SET,  confusion_matrix=True, metrics=True)
-  SVCW6_NS = project_classifier(SklearnClassifier(svc).train, word, wsd_context_features, stopwords_list=NO_STOPWORDS,  confusion_matrix=True, metrics=True)
-
-
-  rfc = RandomForestClassifier()
-  RFC300 = project_classifier(SklearnClassifier(rfc).train, word, wsd_word_features, stopwords_list=STOPWORDS_SET,  confusion_matrix=True, metrics=True)
-  RFC300_NS = project_classifier(SklearnClassifier(rfc).train, word, wsd_word_features, stopwords_list=NO_STOPWORDS,  confusion_matrix=True, metrics=True)
-  
-  RFCW6 = project_classifier(SklearnClassifier(rfc).train, word, wsd_context_features, stopwords_list=STOPWORDS_SET,  confusion_matrix=True, metrics=True)
-  RFCW6_NS = project_classifier(SklearnClassifier(rfc).train, word, wsd_context_features, stopwords_list=NO_STOPWORDS,  confusion_matrix=True, metrics=True)
-
-
-  dtc = DecisionTreeClassifier()
-  DTC300 = project_classifier(SklearnClassifier(dtc).train, word, wsd_word_features, stopwords_list=STOPWORDS_SET,  confusion_matrix=True, metrics=True)
-  DTC300_NS = project_classifier(SklearnClassifier(dtc).train, word, wsd_word_features, stopwords_list=NO_STOPWORDS,  confusion_matrix=True, metrics=True)
-  
-  DTCW6 = project_classifier(SklearnClassifier(dtc).train, word, wsd_context_features, stopwords_list=STOPWORDS_SET,  confusion_matrix=True, metrics=True)
-  DTCW6_NS = project_classifier(SklearnClassifier(dtc).train, word, wsd_context_features, stopwords_list=NO_STOPWORDS,  confusion_matrix=True, metrics=True)
-
 
 def gen_average_table_data(results, category_title, modifiers):
   # results = {CATEGORY1: {WORD1: {acc: 0}}}
   comb_values_base = {}
-  header = [category_title, "Pre","d_Pre","Rec","d_Rec","Acc","d_Acc","F1","d_F1"]
+  header = [category_title, "Precision","ΔPrecision","Recall","ΔRecall","Accuracy","ΔAccuracy","F1","ΔF1"]
   rows = [header]
   for category in list(results.keys()):
     combined_values = {"precision":[],"recall": [],"accuracy": [],"f1": []}
@@ -110,7 +78,6 @@ def gen_average_table_data(results, category_title, modifiers):
           row.append(string)
         else:
           row.append("")
-    print(comb_values_base == combined_values)
     print(row)
     rows.append(row)
   return rows
@@ -127,8 +94,8 @@ def gen_individual_table_data(results, category_title, modifiers):
   indices = [1,2,3,4]
   datas = []
   for word in list(results.keys()):
-    header = [category_title+ " " + word + "<br>Precision<br>d_Precision<br>Recall<br>d_Recall<br>Accuracy<br>d_Accuracy<br>F1<br>d_F1"]
-    header = [word, "Pre","d_Pre","Rec","d_Rec","Acc","d_Acc","F1","d_F1"]
+    #header = [category_title+ " " + word + "<br>Precision<br>d_Precision<br>Recall<br>d_Recall<br>Accuracy<br>d_Accuracy<br>F1<br>d_F1"]
+    header = [word, "Precision","ΔPrecision","Recall","ΔRecall","Accuracy","ΔAccuracy","F1","ΔF1"]
     rows = [header]
     columns = list(results.keys())
     for category in list(results[word].keys()):
@@ -143,11 +110,8 @@ def gen_individual_table_data(results, category_title, modifiers):
           row.append(str(round((results[word][category][test] / results[word][category_title][test] * 100) - 100, 1))+"%")
         else:
           row.append("")
-        
-        
-        
+          
       rows.append(row)
-
     datas.append(rows)
     
 
@@ -158,7 +122,7 @@ def gen_individual_table_data(results, category_title, modifiers):
 
 def gen_graph(data, name):
   #results = [[columnd id, column0, column1, ...]]
-  ["Test Category","Precision","d_Precision", "Recall", "d_Recall", "Accuracy", "d_Accuracy", "F1", "d_F1"]
+  #["Test Category","Precision","d_Precision", "Recall", "d_Recall", "Accuracy", "d_Accuracy", "F1", "d_F1"]
   try:
     os.mkdir(os.getcwd()+"/images/")
   except:
@@ -167,35 +131,106 @@ def gen_graph(data, name):
   plotly.io.write_image(table, os.getcwd()+"/images/"+name)
 
 
-def gen_NB300_graphs(word):
-  #NB, with features based on 300 most frequent context words
-  NB300 = project_classifier(NaiveBayesClassifier.train, 
-    word, wsd_word_features, 
-    confusion_matrix=False,
-    metrics=True)
+def gen_graphs(word, trainers_and_features, avg_only=False):
+  # word = "hard.pos" or something similar
+  #trainers_and_features = {name: (trainer_function, features_function)}
 
-  #Without stopword filtering
-  NB300_NS = project_classifier(NaiveBayesClassifier.train, 
-    word, wsd_word_features, 
-    stopwords_list=NO_STOPWORDS, 
-    confusion_matrix=False, 
-    metrics=True)
+  for index, name in enumerate(trainers_and_features):
+    #no preprocessing
+    org = project_classifier(trainers_and_features[name][0], 
+      word, trainers_and_features[name][1],
+      stopwords_list=NO_STOPWORDS,
+      no_global_cache=True,
+      confusion_matrix=False,
+      metrics=True)
 
-  modifiers = ["_NS"] #no stops modifier. Later no stemming and others.
+    #with stopword filtering
+    stop_SW = project_classifier(trainers_and_features[name][0], 
+      word, trainers_and_features[name][1],
+      no_global_cache=True,
+      confusion_matrix=False, 
+      metrics=True)
+    
+    #remove empty entries from context sentance e.g. ("''")
+    remove_RE = project_classifier(trainers_and_features[name][0], 
+      word, trainers_and_features[name][1],
+      stopwords_list=NO_STOPWORDS,
+      remove_empties=True,
+      no_global_cache=True,
+      confusion_matrix=False, 
+      metrics=True)
 
-  results = {"NB300": NB300, "NB300_NS": NB300_NS}
-  inverted_results = gen_word_dicts(results)
+    #replace accented characters (replace accents)
+    replace_RC = project_classifier(trainers_and_features[name][0], 
+      word, trainers_and_features[name][1],
+      stopwords_list=NO_STOPWORDS,
+      replace_chars=True,
+      no_global_cache=True,
+      confusion_matrix=False, 
+      metrics=True)
 
-  avg_data = gen_average_table_data(results, word, modifiers)
-  sense_datas = gen_individual_table_data(inverted_results, "NB300", modifiers)
+    #stem entries (stem)
+    stem_ST = project_classifier(trainers_and_features[name][0], 
+      word, trainers_and_features[name][1],
+      stopwords_list=NO_STOPWORDS,
+      stem=True,
+      no_global_cache=True,
+      confusion_matrix=False, 
+      metrics=True)
 
-  #Create average graph.
-  gen_graph(avg_data, word+"_avg.png")
+    stopstem_SS = project_classifier(trainers_and_features[name][0], 
+      word, trainers_and_features[name][1],
+      stem=True,
+      no_global_cache=True,
+      confusion_matrix=False, 
+      metrics=True)
 
-  #Create graphs for individual senses.
-  for i in range(len(sense_datas)):
-    gen_graph(sense_datas[i], word+"_"+str(i)+".png")
+    #all of the above (preprocessing)
+    all_ALL = project_classifier(trainers_and_features[name][0], 
+      word, trainers_and_features[name][1],
+      remove_empties=True,
+      replace_chars=True,
+      stem=True,
+      no_global_cache=True,
+      confusion_matrix=False, 
+      metrics=True)
+
+    
+
+    modifiers = ["_NS", "_SW", "_RE", "_RC", "_ST", "_SS", "_ALL"]
+
+    results = {name: org, name+"_SW": stop_SW, name+"_RE": remove_RE, name+"_RC": replace_RC, name+"_ST": stem_ST, name+"_SS": stopstem_SS , name+"_ALL": all_ALL}
+    inverted_results = gen_word_dicts(results)
+
+    avg_data = gen_average_table_data(results, word, modifiers)
+    #Create average graph.
+    gen_graph(avg_data, name+"_"+word+"_avg.png")
+
+    #Create graphs for individual senses.
+    if not avg_only:
+      sense_datas = gen_individual_table_data(inverted_results, name, modifiers)
+      for i in range(len(sense_datas)):
+        gen_graph(sense_datas[i], name+"_"+word+"_"+str(i)+".png")
 
 if __name__ == "__main__":
   word = "hard.pos"
-  gen_NB300_graphs(word)
+  svc = LinearSVC()
+  rfc = RandomForestClassifier()
+  dtc = DecisionTreeClassifier()
+
+  trainers_and_features = {
+    "NB300": (NaiveBayesClassifier.train, wsd_word_features),
+    "NBW6": (NaiveBayesClassifier.train, wsd_context_features),
+    
+    "SVC300": (SklearnClassifier(svc).train, wsd_word_features),
+    "SVCW6" : (SklearnClassifier(svc).train, wsd_context_features),
+
+    "RFC300": (SklearnClassifier(rfc).train, wsd_word_features),
+    "RFCW6" : (SklearnClassifier(rfc).train, wsd_context_features),
+
+    "DTC300": (SklearnClassifier(dtc).train, wsd_word_features),
+    "DTCW6" : (SklearnClassifier(dtc).train, wsd_context_features),
+    
+    }
+  #Takes a while.
+  gen_graphs(word, trainers_and_features, avg_only=True)

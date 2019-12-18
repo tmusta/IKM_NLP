@@ -6,12 +6,15 @@ from nltk.corpus import senseval
 from nltk.classify import accuracy, NaiveBayesClassifier, MaxentClassifier
 from nltk.classify.scikitlearn import SklearnClassifier
 
+
+
 from sklearn.svm import LinearSVC
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.tree import DecisionTreeClassifier
 
 from collections import defaultdict
 from wsd_code import senses, sense_instances, STOPWORDS_SET, wsd_context_features, wsd_word_features, extract_vocab_frequency, extract_vocab
+from preprocessing import *
 
 
 _inst_cache = {}
@@ -48,15 +51,38 @@ def accuracy_per_label(truth, preds, label):
 def f1_score(precision, recall):
     return 2*(precision*recall)/(precision+recall)
 
+
+
+
 ### wsd_classifier() with support for stemming and statistical performance metrics.
-def project_classifier(trainer, word, features, stopwords_list=STOPWORDS_SET, number=300, log=False, distance=3, confusion_matrix=False, metrics = False):
+def project_classifier(trainer, word, features, stopwords_list=STOPWORDS_SET, stem=False, replace_chars=False, remove_empties=False, number=300, no_global_cache=False, log=False, distance=3, confusion_matrix=False, metrics = False):
+    #NOTICE UPDATED PARAMS, works without changing them also, but they are there.
     print("Reading data...")
-    global _inst_cache
-    if word not in _inst_cache:
-        _inst_cache[word] = [(i, i.senses[0]) for i in senseval.instances(word)]
-    events = _inst_cache[word][:]
+
+    #global_cache screws up calls with different preprocessing params.
+    #could probably optimize this so that the data doesn't need to be read every time, but this is used only for the graph generation so doesn't really matter.
+    if no_global_cache:
+      cache = {}
+      cache[word] = [(i, i.senses[0]) for i in senseval.instances(word)]
+      events = cache[word][:]
+    else:
+      global _inst_cache
+      if word not in _inst_cache:
+          _inst_cache[word] = [(i, i.senses[0]) for i in senseval.instances(word)]
+      events = _inst_cache[word][:]
+
     senses = list(set(l for (i, l) in events))
     instances = [i for (i, l) in events]
+    
+    
+    #PREPROCESSING ADDED HERE
+    if stem or replace_chars or remove_empties:
+      stemmer = None
+      if stem:
+        stemmer = PorterStemmer()
+      instances = preprocess_instances(instances, stemmer, replace_chars, remove_empties)
+
+    
     vocab = extract_vocab(instances, stopwords=stopwords_list, n=number)
     print(' Senses: ' + ' '.join(senses))
 
