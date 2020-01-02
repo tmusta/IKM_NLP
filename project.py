@@ -40,16 +40,28 @@ NO_STOPWORDS = []
 #    return sum([(y == label and x == label) or (y != label and x != label) for x, y in zip(truth, preds)]) / len(truth)
 
 def recall(truth, preds, label):
-    return sum([x == label and y == label for x, y in zip(preds, truth)]) / sum([x == label for x in truth])
+    try:
+        return sum([x == label and y == label for x, y in zip(preds, truth)]) / sum([x == label for x in truth])
+    except ZeroDivisionError:
+        return 0.0
 
 def precision(truth, preds, label):
-    return sum([x == label and y == label for x, y in zip(preds, truth)]) / sum([x == label for x in preds])
+    try:
+        return sum([x == label and y == label for x, y in zip(preds, truth)]) / sum([x == label for x in preds])
+    
+    except ZeroDivisionError:
+        return 0.0
+
 
 def accuracy_per_label(truth, preds, label):
     return sum([(x == label and y == label) or (x != label and y != label) for x, y in zip(preds, truth)]) / len(truth)
 
 def f1_score(precision, recall):
-    return 2*(precision*recall)/(precision+recall)
+    try:
+        return 2*(precision*recall)/(precision+recall)
+    
+    except ZeroDivisionError:
+        return 0.0
 
 
 
