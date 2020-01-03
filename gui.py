@@ -1,4 +1,5 @@
 import tkinter as tk
+from lesk import extended_lesk, standard_lesk
 
 primary_color = "#161616"
 secondary_color = "#1b1c1d"
@@ -14,6 +15,44 @@ header_font = ("Sans Serif", "24")
 middle_font_bold = ("Sans Serif", "18", "bold")
 normal_font = ("Sans Serif", "12")
 
+class ResultsFrame:
+  def __init__(self, parent_window, title, column, row):
+    self.window = tk.Frame(parent_window, background=secondary_color)
+    self.window.grid(column=column, row=row, sticky="W,E", pady=10, padx=5, columnspan=1)
+    self.window.grid_remove()
+
+    
+    self.title_label = tk.Label(self.window, text=title, fg=primary_text_color, background=secondary_color, font=middle_font_bold, wraplengt=400, justify="left")
+    self.title_label.grid(column=1, row=1, sticky="W,E", pady=10, padx=5, columnspan=1)
+
+    #guess label init
+    self.guess_label = tk.Label(self.window, text="", fg=primary_text_color, background=secondary_color, font=middle_font_bold, wraplengt=400, justify="left")
+    self.guess_label.grid(column=1, row=2, sticky="W", pady=10, padx=5, columnspan=1)
+
+    #definition label init
+    self.definition_label = tk.Label(self.window, text="", fg=primary_text_color, background=secondary_color, font=normal_font, wraplengt=400, justify="left")
+    self.definition_label.grid(column=1, row=3, sticky="W", pady=10, padx=5, columnspan=1)
+
+    #example sentance label init
+    self.example_label = tk.Label(self.window, text="", fg=primary_text_color, background=secondary_color, font=normal_font, wraplengt=400, justify="left")
+    self.example_label.grid(column=1, row=4, sticky="W", pady=10, padx=5, columnspan=1)
+
+    self.visibility = False
+
+  def reset(self):
+    self.guess_label.configure(text="")
+    self.definition_label.configure(text="")
+    self.example_label.configure(text="")
+    if self.visibility:
+      self.toggle_visibility()
+
+  def toggle_visibility(self):
+    if self.visibility:
+      self.window.grid_remove()
+      self.visibility = False
+    else:
+      self.window.grid()
+      self.visibility = True
 
 class GUI:
   def __init__(self):
@@ -23,7 +62,7 @@ class GUI:
 
 
     #word entry field init
-    self.word_string = tk.Entry(self.window, fg=secondary_text_color, background=secondary_color, insertbackground=primary_text_color, width=50, font=normal_font)
+    self.word_string = tk.Entry(self.window, fg=secondary_text_color, background=secondary_color, insertbackground=primary_text_color, font=normal_font)
     self.word_string.insert(0, "Word to Disambiguate")
     self.word_string.bind("<FocusIn>", self.focus_in_word)
     self.word_string.bind("<FocusOut>", self.focus_out_word)
@@ -49,19 +88,16 @@ class GUI:
     #results header init
     self.results_header_label = tk.Label(self.window, text="Waiting for Inputs", fg=primary_text_color, background=primary_color, font=header_font)
     self.results_header_label.grid(column=1, row=5, sticky="W", pady=10, padx=5)
+    
+    #results frame
+    self.results_parent = tk.Frame(self.window, background=primary_color)
+    self.results_parent.grid(column=1, row=6, sticky="W,E", pady=10, padx=5, columnspan=2)
 
-    #guess label init
-    self.results_guess_label = tk.Label(self.window, text="", fg=primary_text_color, background=primary_color, font=middle_font_bold)
-    self.results_guess_label.grid(column=1, row=6, sticky="W", pady=10, padx=5, columnspan=2)
+    self.lesk = ResultsFrame(self.results_parent, "Standard Lesk", column=1, row=1)
+    self.ex_lesk = ResultsFrame(self.results_parent, "Extended Lesk", column=2, row=1)
 
-    #definition label init
-    self.results_definition_label = tk.Label(self.window, text="", fg=primary_text_color, background=primary_color, font=normal_font)
-    self.results_definition_label.grid(column=1, row=7, sticky="W", pady=10, padx=5, columnspan=2)
 
-    #example sentance label init
-    self.results_example_label = tk.Label(self.window, text="", fg=primary_text_color, background=primary_color, font=normal_font)
-    self.results_example_label.grid(column=1, row=8, sticky="W", pady=10, padx=5, columnspan=2)
-
+    
 
   def focus_in_word(self, event):
     #focus in event handler for word field
@@ -94,27 +130,64 @@ class GUI:
     self.word_string.delete(0,tk.END)
     self.context_string.delete("1.0", tk.END)
     self.window.focus()
-
-    #reset placeholders
-    self.word_string.insert(0, "Word to Disambiguate")
-    self.word_string.configure(fg=secondary_text_color)
-    self.context_string.insert("1.0", "Context Sentance for the Word")
-    self.context_string.configure(fg=secondary_text_color)
-
     self.results_header_label.configure(text="Waiting for Inputs")
-    self.results_guess_label.configure(text="")
-    self.results_definition_label.configure(text="")
-    self.results_example_label.configure(text="")
+
+    #reset result_frames
+    self.lesk.reset()
+    self.ex_lesk.reset()
+    
+
+  def extend_tag(self, tag):
+    tag_table = {"a": "Adjective", "n": "Noun", "v":"Verb", "s": "Adjective Satellite", "r": "Adverb"}
+    try:
+      return tag_table[tag]
+    except KeyError:
+      return tag
+
+  def disambiguate_and_insert_results(self, frame, word, sentance, func):
+    frame.reset()
+    try:
+      result = func(word,sentance)
+      if result is None:
+        frame.guess_label.configure(text="No Results Available")
+        if(frame.visibility == False):
+          frame.toggle_visibility()
+        return
+          
+        
+      try:
+        definition = result.definition()
+      except AttributeError:
+        definition = "No Definition Available."
+
+      try:
+        example = result.examples()[0]
+      except IndexError:
+        example = "No Example Sentance Available."
+      frame.guess_label.configure(text=result.name() + " (" + self.extend_tag(result.pos())+")")
+      frame.definition_label.configure(text=definition)
+      frame.example_label.configure(text=example)
+      if(frame.visibility == False):
+        frame.toggle_visibility()
+      self.results_header_label.configure(text="Results:")
+    except ValueError or AttributeError:
+      self.results_header_label.configure(text="Invalid Parameters.")
+
 
   def disambiguate(self, event):
-    #Event handler for the disambiguate button, currently results hard coded. Will update after other parts ready.
-    guess_string, definition_string, example_string = "Hard (adjective)", "not easy; requiring great physical or mental effort to accomplish or comprehend or endure", "\"why is it so hard for you to keep a secret?\""
-    #TODO connect the above to the classifier
-    print(event)
-    self.results_header_label.configure(text="Results:")
-    self.results_guess_label.configure(text=guess_string)
-    self.results_definition_label.configure(text=definition_string)
-    self.results_example_label.configure(text=example_string)
+
+    self.results_header_label.configure(text="Processing...")
+    
+    word = self.word_string.get()
+    sentance = self.context_string.get("1.0", tk.END)
+    if not word.lower() in sentance.lower():
+      self.results_header_label.configure(text="Sentance doesn't contain the word.")
+      return
+    #do standard lesk results
+    self.disambiguate_and_insert_results(self.lesk,word,sentance,standard_lesk)
+    #do extended lesk results
+    self.disambiguate_and_insert_results(self.ex_lesk,word,sentance,extended_lesk)
+      
 
 
 

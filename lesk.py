@@ -120,7 +120,7 @@ def extended_lesk(word, context, sense_limit=None):
 def standard_lesk(word, context, synsets=None):
     if synsets:
     	synsets = get_senseval_synsets(word)
-    return lesk(context.split(" "), "hard", synsets)
+    return lesk(context.split(" "), word, synsets)
 
 ### wsd_classifier() with support for stemming and statistical performance metrics.
 def senseval_lesk(word, f, stopwords_list=STOPWORDS_SET, number=300, confusion_matrix=False, metrics = False):
