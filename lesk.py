@@ -56,7 +56,7 @@ NO_STOPWORDS = []
 def remove_useless_symbols(w):
     return re.sub(r'\W+', '', w)
 
-def extend_list(words):
+def extend_list(words, use_examples=False):
     extended_words = []
     for w in words:
         for i in  wordnet.synsets(w):
@@ -71,6 +71,13 @@ def extend_list(words):
                 for s in h.lemma_names():
                     if s not in extended_words:
                         extended_words.append(s)
+            if use_examples:
+            	for e in i.examples():
+            	    for s in e.split(' '):
+            	        if s not in extended_words:
+            	            extended_words.append(s)
+                
+            
             for a in i.lemmas()[0].antonyms(): #antonyms are accessed only from lemmas. The first lemma is directly related to the word. We ignore the antonyms of synonyms
                 
                 if a.name() not in extended_words:
@@ -86,7 +93,7 @@ def get_senseval_synsets(word):
     	        synsets.append(i)
     return synsets
 
-def extended_lesk(word, context, sense_limit=None):
+def extended_lesk(word, context, sense_limit=None, use_examples=False):
     ###PERFORMS EXTENDED LESK
     ### word = target word
     ### context = paragraph or sentence with the word in context
@@ -106,7 +113,7 @@ def extended_lesk(word, context, sense_limit=None):
         target_synsets = target_synsets[:sense_limit]
     ### WE EXTEND THE CONTEXT WORDS
     orig_context_words = context.split(" ")
-    extended_context_words = extend_list(orig_context_words)
+    extended_context_words = extend_list(orig_context_words, use_examples=use_examples)
     ###WE CALCULATE COMMON WORDS WITH SENSES
     for i in target_senses:
 
@@ -117,13 +124,14 @@ def extended_lesk(word, context, sense_limit=None):
     argmax = np.argmax(target_sense_scores)
     return target_synsets[argmax]
 
-def standard_lesk(word, context, synsets=None):
+def standard_lesk(word, context, synsets=None, use_examples=None):
+    
     if synsets:
     	synsets = get_senseval_synsets(word)
     return lesk(context.split(" "), word, synsets)
 
 ### wsd_classifier() with support for stemming and statistical performance metrics.
-def senseval_lesk(word, f, stopwords_list=STOPWORDS_SET, number=300, confusion_matrix=False, metrics = False):
+def senseval_lesk(word, f, stopwords_list=STOPWORDS_SET, number=300, confusion_matrix=False, metrics = False, use_examples=False):
     print("Reading data...")
     global _inst_cache
     if word not in _inst_cache:
@@ -149,7 +157,7 @@ def senseval_lesk(word, f, stopwords_list=STOPWORDS_SET, number=300, confusion_m
         else:
             pred = extended_lesk(word.split(".")[0], i, sense_limit=3)
         """
-        pred = f(word.split(".")[0], i)
+        pred = f(word.split(".")[0], i, use_examples=use_examples)
         #print(pred.name(), j)
         if pred.name() in label_translator:
             preds.append(label_translator[pred.name()])
@@ -211,16 +219,19 @@ if __name__=="__main__":
     context = "It's hard on my vocal chords"
     
 
-    print(query,",",context)
+    #print(query,",",context)
     #print("standard lesk: ", standard_lesk(query, context, synsets=True).definition())
     #print("extended lesk: ", extended_lesk(query, context).definition())
 
     ###TASK 5 & 6
+    
     print("Standard Lesk")
-    print(senseval_lesk(word, standard_lesk, metrics=True, confusion_matrix=True))
+    print(senseval_lesk(word, standard_lesk), metrics=True, confusion_matrix=True)
     print("Extended Lesk")
-    print(senseval_lesk(word, extended_lesk, metrics=True, confusion_matrix=True))
-
+    print(senseval_lesk(word, extended_lesk), metrics=True, confusion_matrix=True)
+    print("Extended Lesk with examples")
+    print(senseval_lesk(word, extended_lesk, use_examples=True, metrics=True, confusion_matrix=True))
+    
     print("NB, with features based on 300 most frequent context words")
     project_classifier(NaiveBayesClassifier.train, word, wsd_word_features, confusion_matrix=True, metrics=True)
     print("")
