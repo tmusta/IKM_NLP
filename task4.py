@@ -1,5 +1,6 @@
 from wsd_code import *
 from project import *
+from lesk import *
 import os
 
 import plotly.graph_objs as go
@@ -83,7 +84,31 @@ def gen_average_table_data(results, category_title, modifiers):
   return rows
 
 
+def gen_average_table_data_without_delta(results, category_title):
+  header = [category_title, "Precision","Recall","Accuracy","F1"]
+  rows = [header]
+  print(results)
+  for category in list(results.keys()):
+    combined_values = {"precision":[],"recall": [],"accuracy": [],"f1": []}
 
+    for word in list(results[category].keys()):
+
+      for test in list(results[category][word].keys()):
+        if test != "w_acc":
+          combined_values[test].append(results[category][word][test])
+          row = [category]
+
+      for test in list(results[category][word].keys()):
+        if test == "accuracy":
+          row.append(str(round(results[category][word]["w_acc"],3)))
+        elif test == "w_acc":
+          pass
+        else:
+          average = sum(combined_values[test])/len(combined_values[test])
+          row.append(str(round(average,3)))
+    print(row)
+    rows.append(row)
+  return rows
 
     
 
@@ -107,7 +132,10 @@ def gen_individual_table_data(results, category_title, modifiers):
         #this nightmare loop calculates the delta values for the table. modifiers should be a list of all ending modifiers: e.g. ["_NS", "_STEM"]
         
         if list(results[word][category].keys()) and [category.endswith(i) for i in modifiers].count(True):
-          row.append(str(round((results[word][category][test] / results[word][category_title][test] * 100) - 100, 1))+"%")
+          string = str(round((results[word][category][test] / results[word][category_title][test] * 100) - 100, 1))+"%"
+          if not string.startswith("-"):
+            string = "+"+string
+          row.append(string)
         else:
           row.append("")
           
@@ -117,7 +145,24 @@ def gen_individual_table_data(results, category_title, modifiers):
 
   return datas
 
-      
+def gen_individual_table_data_without_deltas(results, sense):
+  datas = []
+
+  #header = [category_title+ " " + word + "<br>Precision<br>d_Precision<br>Recall<br>d_Recall<br>Accuracy<br>d_Accuracy<br>F1<br>d_F1"]
+  header = [sense, "Precision","Recall","Accuracy","F1"]
+  rows = [header]
+  columns = list(results.keys())
+  for category in list(results.keys()):
+    row = [category]
+
+    
+    for test in list(results[category].keys()):
+      #
+      if test != "w_acc":
+        row.append(round(results[category][test], 3))
+        
+    rows.append(row)
+  return rows
 
 
 def gen_graph(data, name):
@@ -129,6 +174,31 @@ def gen_graph(data, name):
     pass
   table = ff.create_table(data)
   plotly.io.write_image(table, os.getcwd()+"/images/"+name)
+
+def gen_classifier_graphs(word, trainers_and_features):
+  results_standard = senseval_lesk(word, standard_lesk, NO_STOPWORDS, metrics=True)
+  results_extended = senseval_lesk(word, extended_lesk, NO_STOPWORDS, metrics=True)
+  results = {}
+
+  for index, name in enumerate(trainers_and_features):
+    result = project_classifier(trainers_and_features[name][0], word, trainers_and_features[name][1], no_global_cache=True, metrics=True)
+    results[name] = result
+  
+  
+
+  results["Lesk"] = results_standard
+  results["lesk_ex"] = results_extended
+  inverted_results = gen_word_dicts(results)
+
+  avg_data = gen_average_table_data_without_delta(results, word)
+  #Create average graph.
+  gen_graph(avg_data, "lesk_"+word+"_avg.png")
+  
+  #print(inverted_results)
+  for sense in inverted_results.keys():
+    sense_data = gen_individual_table_data_without_deltas(inverted_results[sense], sense)
+    gen_graph(sense_data, "lesk_"+sense+".png")
+
 
 
 def gen_graphs(word, trainers_and_features, avg_only=False):
@@ -212,8 +282,10 @@ def gen_graphs(word, trainers_and_features, avg_only=False):
       for i in range(len(sense_datas)):
         gen_graph(sense_datas[i], name+"_"+word+"_"+str(i)+".png")
 
+
+
 if __name__ == "__main__":
-  word = "hard.pos"
+  word = "interest.pos"
   svc = LinearSVC()
   rfc = RandomForestClassifier()
   dtc = DecisionTreeClassifier()
@@ -233,4 +305,5 @@ if __name__ == "__main__":
     
     }
   #Takes a while.
-  gen_graphs(word, trainers_and_features, avg_only=True)
+  #gen_graphs(word, trainers_and_features, avg_only=False)
+  gen_classifier_graphs(word, trainers_and_features)

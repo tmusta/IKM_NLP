@@ -177,6 +177,7 @@ def senseval_lesk(word, f, stopwords_list=STOPWORDS_SET, number=300, confusion_m
         #derived = [f(word.split(".")[0], i).name() for (i,label) in test_data]
         derived = [i for i in preds]
         results = {}
+        w_acc = acc
         for i in senses:
             p = precision(gold, derived, i)
             r = recall(gold, derived, i)
@@ -186,13 +187,13 @@ def senseval_lesk(word, f, stopwords_list=STOPWORDS_SET, number=300, confusion_m
             #print(i, " Precision: %6.4f Recall: %6.4f Accuracy: %6.4f F1-score: %6.4f"%p,r,acc,f1)
             
             #added results dict that returns from the function
-            results[i] = {"precision":p,"recall": r,"accuracy": acc,"f1": f1}
+            results[i] = {"precision":p,"recall": r,"accuracy": acc,"f1": f1, "w_acc": w_acc}
         return results
 
 
 
 if __name__=="__main__":
-    word = 'line.pos'
+    word = 'hard.pos'
     if word not in _inst_cache:
         _inst_cache[word] = [(i, i.senses[0]) for i in senseval.instances(word)]
     events = _inst_cache[word][:]
