@@ -3,7 +3,7 @@ from project import *
 from lesk import *
 import os
 
-import plotly.graph_objs as go
+import plotly.graph_objects as go
 import plotly.figure_factory as ff
 
 import plotly
@@ -58,8 +58,9 @@ def gen_average_table_data(results, category_title, modifiers):
 
     for word in list(results[category].keys()):
       for test in list(results[category][word].keys()):
-        combined_values[test].append(results[category][word][test])
-        row = [category]
+        if test != "w_acc":
+          combined_values[test].append(results[category][word][test])
+          row = [category]
 
       if [category.endswith(i) for i in modifiers].count(True) == 0:
         comb_values_base = combined_values
@@ -67,18 +68,31 @@ def gen_average_table_data(results, category_title, modifiers):
       for test in list(results[category][word].keys()):
         
         #add the rounded average of different senses scores
-        average = sum(combined_values[test])/len(combined_values[test])
-        row.append(str(round(average,3)))
-        #add the delta value
-        
-        if list(results[category][word].keys()) and [category.endswith(i) for i in modifiers].count(True):
-          base_average = sum(comb_values_base[test])/len(comb_values_base[test])
-          string = str(round((((average / base_average) * 100) - 100),1))+"%"
-          if not string.startswith("-"):
-            string = "+"+string
-          row.append(string)
+        if test == "accuracy":
+          row.append(str(round(results[category][word]["w_acc"],3)))
+          if list(results[category][word].keys()) and [category.endswith(i) for i in modifiers].count(True):
+            base_average = results[category.split("_")[0]][word]["w_acc"]
+            string = str(round((((results[category][word]["w_acc"] / base_average) * 100) - 100),1))+"%"
+            if not string.startswith("-"):
+              string = "+"+string
+            row.append(string)
+          else:
+            row.append("")
+        elif test == "w_acc":
+          pass
         else:
-          row.append("")
+          average = sum(combined_values[test])/len(combined_values[test])
+          row.append(str(round(average,3)))
+          #add the delta value
+          
+          if list(results[category][word].keys()) and [category.endswith(i) for i in modifiers].count(True):
+            base_average = sum(comb_values_base[test])/len(comb_values_base[test])
+            string = str(round((((average / base_average) * 100) - 100),1))+"%"
+            if not string.startswith("-"):
+              string = "+"+string
+            row.append(string)
+          else:
+            row.append("")
     print(row)
     rows.append(row)
   return rows
@@ -128,16 +142,20 @@ def gen_individual_table_data(results, category_title, modifiers):
       
       for test in list(results[word][category].keys()):
         #
-        row.append(round(results[word][category][test], 3))
-        #this nightmare loop calculates the delta values for the table. modifiers should be a list of all ending modifiers: e.g. ["_NS", "_STEM"]
-        
-        if list(results[word][category].keys()) and [category.endswith(i) for i in modifiers].count(True):
-          string = str(round((results[word][category][test] / results[word][category_title][test] * 100) - 100, 1))+"%"
-          if not string.startswith("-"):
-            string = "+"+string
-          row.append(string)
-        else:
-          row.append("")
+        if test != "w_acc":
+          row.append(round(results[word][category][test], 3))
+          #this nightmare loop calculates the delta values for the table. modifiers should be a list of all ending modifiers: e.g. ["_NS", "_STEM"]
+          
+          if list(results[word][category].keys()) and [category.endswith(i) for i in modifiers].count(True):
+            try:
+              string = str(round((results[word][category][test] / results[word][category_title][test] * 100) - 100, 1))+"%"
+            except ZeroDivisionError:
+              string = "NaN"
+            if not string.startswith("-"):
+              string = "+"+string
+            row.append(string)
+          else:
+            row.append("")
           
       rows.append(row)
     datas.append(rows)
@@ -164,6 +182,14 @@ def gen_individual_table_data_without_deltas(results, sense):
     rows.append(row)
   return rows
 
+def gen_graph2(data, name):
+  try:
+    os.mkdir(os.getcwd()+"/images/")
+  except:
+    pass
+  fig = go.Figure(data=[go.Table(header=dict(values=data[0], line_color="gray", fill_color="lightgray", align="left"), cells=dict(values=data[0:]))])
+  fig.write_image(os.getcwd()+"/images/"+name)
+
 
 def gen_graph(data, name):
   #results = [[columnd id, column0, column1, ...]]
@@ -173,6 +199,7 @@ def gen_graph(data, name):
   except:
     pass
   table = ff.create_table(data)
+
   plotly.io.write_image(table, os.getcwd()+"/images/"+name)
 
 def gen_classifier_graphs(word, trainers_and_features):
@@ -220,6 +247,23 @@ def gen_graphs(word, trainers_and_features, avg_only=False):
       no_global_cache=True,
       confusion_matrix=False, 
       metrics=True)
+    """
+    stop2 = project_classifier(trainers_and_features[name][0], 
+      word, trainers_and_features[name][1],
+      stopwords_list=NO_STOPWORDS,
+      stopwords_own=True,
+      no_global_cache=True,
+      confusion_matrix=False, 
+      metrics=True)
+    """
+
+    extend = project_classifier(trainers_and_features[name][0], 
+      word, trainers_and_features[name][1],
+      stopwords_list=NO_STOPWORDS,
+      ext_words=True,
+      no_global_cache=True,
+      confusion_matrix=False, 
+      metrics=True)
     
     #remove empty entries from context sentance e.g. ("''")
     remove_RE = project_classifier(trainers_and_features[name][0], 
@@ -248,12 +292,6 @@ def gen_graphs(word, trainers_and_features, avg_only=False):
       confusion_matrix=False, 
       metrics=True)
 
-    stopstem_SS = project_classifier(trainers_and_features[name][0], 
-      word, trainers_and_features[name][1],
-      stem=True,
-      no_global_cache=True,
-      confusion_matrix=False, 
-      metrics=True)
 
     #all of the above (preprocessing)
     all_ALL = project_classifier(trainers_and_features[name][0], 
@@ -264,12 +302,24 @@ def gen_graphs(word, trainers_and_features, avg_only=False):
       no_global_cache=True,
       confusion_matrix=False, 
       metrics=True)
+    """
+    all_ALL2 = project_classifier(trainers_and_features[name][0], 
+      word, trainers_and_features[name][1],
+      stopwords_list=NO_STOPWORDS,
+      remove_empties=True,
+      stopwords_own=True,
+      replace_chars=True,
+      stem=True,
+      no_global_cache=True,
+      confusion_matrix=False, 
+      metrics=True)
+    """
 
     
 
-    modifiers = ["_NS", "_SW", "_RE", "_RC", "_ST", "_SS", "_ALL"]
+    modifiers = ["_NS", "_SW", "_RE", "_RC", "_ST", "_CR", "_ALL"]
 
-    results = {name: org, name+"_SW": stop_SW, name+"_RE": remove_RE, name+"_RC": replace_RC, name+"_ST": stem_ST, name+"_SS": stopstem_SS , name+"_ALL": all_ALL}
+    results = {name: org, name+"_SW": stop_SW, name+"_RE": remove_RE, name+"_RC": replace_RC, name+"_ST": stem_ST, name+"_CR": extend , name+"_ALL": all_ALL}
     inverted_results = gen_word_dicts(results)
 
     avg_data = gen_average_table_data(results, word, modifiers)
@@ -285,25 +335,25 @@ def gen_graphs(word, trainers_and_features, avg_only=False):
 
 
 if __name__ == "__main__":
-  word = "interest.pos"
+  word = "hard.pos"
   svc = LinearSVC()
   rfc = RandomForestClassifier()
   dtc = DecisionTreeClassifier()
-
   trainers_and_features = {
-    "NB300": (NaiveBayesClassifier.train, wsd_word_features),
-    "NBW6": (NaiveBayesClassifier.train, wsd_context_features),
+    #"NB300": (NaiveBayesClassifier.train, wsd_word_features),
+    "NB": (NaiveBayesClassifier.train, wsd_context_features),
     
-    "SVC300": (SklearnClassifier(svc).train, wsd_word_features),
-    "SVCW6" : (SklearnClassifier(svc).train, wsd_context_features),
+    #"SVC300": (SklearnClassifier(svc).train, wsd_word_features),
+    "SVC" : (SklearnClassifier(svc).train, wsd_context_features),
 
-    "RFC300": (SklearnClassifier(rfc).train, wsd_word_features),
-    "RFCW6" : (SklearnClassifier(rfc).train, wsd_context_features),
+    #"RFC300": (SklearnClassifier(rfc).train, wsd_word_features),
+    "RFC" : (SklearnClassifier(rfc).train, wsd_context_features),
 
-    "DTC300": (SklearnClassifier(dtc).train, wsd_word_features),
-    "DTCW6" : (SklearnClassifier(dtc).train, wsd_context_features),
+    #"DTC300": (SklearnClassifier(dtc).train, wsd_word_features),
+    "DTC" : (SklearnClassifier(dtc).train, wsd_context_features),
     
     }
+
   #Takes a while.
-  #gen_graphs(word, trainers_and_features, avg_only=False)
-  gen_classifier_graphs(word, trainers_and_features)
+  gen_graphs(word, trainers_and_features, avg_only=True)
+  #gen_classifier_graphs(word, trainers_and_features)

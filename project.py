@@ -67,7 +67,7 @@ def f1_score(precision, recall):
 
 
 ### wsd_classifier() with support for stemming and statistical performance metrics.
-def project_classifier(trainer, word, features, stopwords_list=STOPWORDS_SET, stem=False, replace_chars=False, remove_empties=False, number=300, no_global_cache=False, log=False, distance=3, confusion_matrix=False, metrics = False):
+def project_classifier(trainer, word, features, stopwords_list=STOPWORDS_SET, stem=False, stopwords_own=False ,ext_words=False, replace_chars=False, remove_empties=False, number=300, no_global_cache=False, log=False, distance=3, confusion_matrix=False, metrics = False):
     #NOTICE UPDATED PARAMS, works without changing them also, but they are there.
     print("Reading data...")
 
@@ -88,11 +88,11 @@ def project_classifier(trainer, word, features, stopwords_list=STOPWORDS_SET, st
     
     
     #PREPROCESSING ADDED HERE
-    if stem or replace_chars or remove_empties:
+    if stem or ext_words or replace_chars or remove_empties or stopwords_own:
       stemmer = None
       if stem:
         stemmer = PorterStemmer()
-      instances = preprocess_instances(instances, stemmer, replace_chars, remove_empties)
+      instances = preprocess_instances(instances, stemmer, stopwords_own, ext_words, replace_chars, remove_empties)
 
     
     vocab = extract_vocab(instances, stopwords=stopwords_list, n=number)
