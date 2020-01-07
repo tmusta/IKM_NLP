@@ -93,7 +93,7 @@ def get_senseval_synsets(word):
     	        synsets.append(i)
     return synsets
 
-def extended_lesk(word, context, sense_limit=None, use_examples=False):
+def extended_lesk(word, context, synsets=None, sense_limit=None, use_examples=False):
     ###PERFORMS EXTENDED LESK
     ### word = target word
     ### context = paragraph or sentence with the word in context
@@ -101,16 +101,26 @@ def extended_lesk(word, context, sense_limit=None, use_examples=False):
     ### returns <class 'nltk.corpus.reader.wordnet.Synset'> object with the predicted sense
 
     ### Extended LESK extends the words in the paragraph with their hyponyms, direct hypernyms, antonyms and synonyms.
-    
+
     target_synsets = []
     target_senses = []
     target_sense_scores = []
-    for n,i in enumerate(wordnet.synsets(word)):
-        target_senses.append(i.definition().split(" "))
-        target_synsets.append(i)
+    if synsets:
+        if not word.endswith(".pos"):
+            target_synsets = get_senseval_synsets(word + ".pos")
+        else:
+            target_synsets = get_senseval_synsets(word)
+        target_senses = [i.definition().split(" ") for i in target_synsets]
+    else:
+        for n,i in enumerate(wordnet.synsets(word)):
+            target_senses.append(i.definition().split(" "))
+            target_synsets.append(i)
+    
+    """
     if sense_limit:
         target_senses = target_senses[:sense_limit]
         target_synsets = target_synsets[:sense_limit]
+    """
     ### WE EXTEND THE CONTEXT WORDS
     orig_context_words = context.split(" ")
     extended_context_words = extend_list(orig_context_words, use_examples=use_examples)
@@ -125,13 +135,16 @@ def extended_lesk(word, context, sense_limit=None, use_examples=False):
     return target_synsets[argmax]
 
 def standard_lesk(word, context, synsets=None, use_examples=None):
-    
+
     if synsets:
-    	synsets = get_senseval_synsets(word)
+        if not word.endswith(".pos"):
+    	    synsets = get_senseval_synsets(word + ".pos")
+        else:
+            synsets = get_senseval_synsets(word)
     return lesk(context.split(" "), word, synsets)
 
 ### wsd_classifier() with support for stemming and statistical performance metrics.
-def senseval_lesk(word, f, stopwords_list=STOPWORDS_SET, number=300, confusion_matrix=False, metrics = False, use_examples=False):
+def senseval_lesk(word, f, stopwords_list=STOPWORDS_SET, number=300, confusion_matrix=False, metrics = False, use_examples=False, synsets=True):
     print("Reading data...")
     global _inst_cache
     if word not in _inst_cache:
@@ -157,7 +170,10 @@ def senseval_lesk(word, f, stopwords_list=STOPWORDS_SET, number=300, confusion_m
         else:
             pred = extended_lesk(word.split(".")[0], i, sense_limit=3)
         """
-        pred = f(word.split(".")[0], i, use_examples=use_examples)
+        pred = f(word.split(".")[0], i, use_examples=use_examples, synsets=synsets)
+        if not pred:
+            preds.append("None")
+            continue
         #print(pred.name(), j)
         if pred.name() in label_translator:
             preds.append(label_translator[pred.name()])
@@ -201,7 +217,9 @@ def senseval_lesk(word, f, stopwords_list=STOPWORDS_SET, number=300, confusion_m
 
 
 if __name__=="__main__":
+
     word = 'hard.pos'
+
     if word not in _inst_cache:
         _inst_cache[word] = [(i, i.senses[0]) for i in senseval.instances(word)]
     events = _inst_cache[word][:]
@@ -224,19 +242,25 @@ if __name__=="__main__":
     #print("extended lesk: ", extended_lesk(query, context).definition())
 
     ###TASK 5 & 6
-    
+
     print("Standard Lesk")
-    print(senseval_lesk(word, standard_lesk), metrics=True, confusion_matrix=True)
+
+    print(senseval_lesk(word, standard_lesk, metrics=True, confusion_matrix=True))
     print("Extended Lesk")
-    print(senseval_lesk(word, extended_lesk), metrics=True, confusion_matrix=True)
+    print(senseval_lesk(word, extended_lesk, metrics=True, confusion_matrix=True))
+
     print("Extended Lesk with examples")
     print(senseval_lesk(word, extended_lesk, use_examples=True, metrics=True, confusion_matrix=True))
+
+
     
+
+    """
     print("NB, with features based on 300 most frequent context words")
     project_classifier(NaiveBayesClassifier.train, word, wsd_word_features, confusion_matrix=True, metrics=True)
     print("")
     print("NB, with features based word + pos in 6 word window")
     project_classifier(NaiveBayesClassifier.train, word, wsd_context_features,confusion_matrix=True, metrics=True)
     print("")
-    
+    """
 
