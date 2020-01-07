@@ -15,7 +15,7 @@ from sklearn.tree import DecisionTreeClassifier
 from collections import defaultdict
 from wsd_code import senses, sense_instances, STOPWORDS_SET, wsd_context_features, wsd_word_features, extract_vocab_frequency, extract_vocab
 from preprocessing import *
-
+import math
 
 _inst_cache = {}
 
@@ -64,10 +64,103 @@ def f1_score(precision, recall):
         return 0.0
 
 
+def wsd_tfidf_features(instance, vocab, dist=3):
+    """
+    Create a featureset where every key returns False unless it occurs in the
+    instance's context
+    """
+    words = [w for (w, f) in vocab]
+    freqs = [f for (w, f) in vocab]
+    features = defaultdict(lambda:False)
+    #features['alwayson'] = True
+    #cur_words = [w for (w, pos) in i.context]
+    try:
+        for(w, pos) in instance.context:
+            if w in words:
+                if not w in features:
+                    features[w] = 1
+                else:
+                    features[w] += 1
+        #for w in features:
+        #    features[w] /= len(instance.context)
+        for w, f in zip(words, freqs):
+            if w in features:
+                features[w] = math.log(1 + features[w]) * math.log(f)
+    except ValueError:
+        pass
+    return features
+
+def N_gram(sentence, N=2, stopwords=STOPWORDS):
+    grams = []
+    #sentence = sentence.split(" ")
+    sentence = [i for i in sentence if not i in stopwords]
+    if len(sentence) < N:
+        return grams
+    for i in range(len(sentence)- N):
+        tmp = ""
+        for j in range(N):
+            if type(sentence[i + j]) == str:
+                tmp += sentence[i + j]
+            elif type(sentence[i + j]) == tuple:
+                tmp += sentence[i + j][0]
+        grams.append(tmp)
+    return grams
+
+def extract_vocab_grams_frequency(instances, stopwords=STOPWORDS_SET, n=300):
+    fd = nltk.FreqDist()
+    for i in instances:
+        (target, suffix) = i.word.split('-')
+        
+        words = (c[0] for c in i.context if not c[0] == target)
+        grams = N_gram(words, stopwords=STOPWORDS_SET)
+        for g in grams:
+            fd[g] += 1
+    return fd.most_common()[:n+1]
+
+def extract_vocab_grams(instances, stopwords=STOPWORDS_SET, n=300):
+    return [w for w,f in extract_vocab_grams_frequency(instances,stopwords,n)]
+
+
+def gram_context_features(instance, vocab, dist=3):
+    features = {}
+    ind = instance.position
+    con = instance.context
+    for i in range(max(0, ind-dist), ind):
+        j = ind-i
+        features['left-context-word-%s(%s)' % (j, con[i][0])] = True
+
+    for i in range(ind+1, min(ind+dist+1, len(con))):
+        j = i-ind
+        features['right-context-word-%s(%s)' % (j, con[i][0])] = True
+
+ 
+    features['word'] = instance.word
+    features['pos'] = con[1][1]
+    return features
+
+def gram_word_features(instance, vocab, dist=3):
+    """
+    Create a featureset where every key returns False unless it occurs in the
+    instance's context
+    """
+    features = defaultdict(lambda:False)
+    features['alwayson'] = True
+    #cur_words = [w for (w, pos) in i.context]
+    try:
+        for(w, pos) in instance:
+            if w in vocab:
+                features[w] = True
+    except ValueError:
+        pass
+    return features
+
 
 
 ### wsd_classifier() with support for stemming and statistical performance metrics.
-def project_classifier(trainer, word, features, stopwords_list=STOPWORDS_SET, stem=False, stopwords_own=False ,ext_words=False, replace_chars=False, remove_empties=False, number=300, no_global_cache=False, log=False, distance=3, confusion_matrix=False, metrics = False):
+
+def project_classifier(trainer, word, features, stopwords_list=STOPWORDS_SET, stem=False, stopwords_own=False ,ext_words=False, replace_chars=False, remove_empties=False, number=300, no_global_cache=False, log=False, distance=3, confusion_matrix=False, metrics = False, vocab_f=extract_vocab, ngrams=False):
+
+
     #NOTICE UPDATED PARAMS, works without changing them also, but they are there.
     print("Reading data...")
 
@@ -95,7 +188,8 @@ def project_classifier(trainer, word, features, stopwords_list=STOPWORDS_SET, st
       instances = preprocess_instances(instances, stemmer, stopwords_own, ext_words, replace_chars, remove_empties)
 
     
-    vocab = extract_vocab(instances, stopwords=stopwords_list, n=number)
+    #vocab = extract_vocab(instances, stopwords=stopwords_list, n=number)
+    vocab = vocab_f(instances, stopwords=stopwords_list, n=number)
     print(' Senses: ' + ' '.join(senses))
 
     # Split the instances into a training and test set,
@@ -107,10 +201,18 @@ def project_classifier(trainer, word, features, stopwords_list=STOPWORDS_SET, st
     test_data = events[int(0.8 * n):n]
     # Train classifier
     print('Training classifier...')
-    classifier = trainer([(features(i, vocab, distance), label) for (i, label) in training_data])
+    classifier = None
+    acc = 0.0
+    if ngrams:
+        classifier = trainer([(features(N_gram(i.context), vocab, distance), label) for (i, label) in training_data])
+    else:
+        classifier = trainer([(features(i, vocab, distance), label) for (i, label) in training_data])
     # Test classifier
     print('Testing classifier...')
-    acc = accuracy(classifier, [(features(i, vocab, distance), label) for (i, label) in test_data] )
+    if ngrams:
+        acc = accuracy(classifier, [(features(N_gram(i.context), vocab, distance), label) for (i, label) in test_data] )
+    else:
+        acc = accuracy(classifier, [(features(i, vocab, distance), label) for (i, label) in test_data] )
     print('Accuracy: %6.4f' % acc)
     if log==True:
         #write error file
@@ -140,55 +242,87 @@ def project_classifier(trainer, word, features, stopwords_list=STOPWORDS_SET, st
         output_error_file.close()
     if confusion_matrix==True:
         gold = [label for (i, label) in test_data]
-        derived = [classifier.classify(features(i,vocab)) for (i,label) in test_data]
+        derived = None
+        if ngrams:
+            derived = [classifier.classify(features(N_gram(i.context),vocab)) for (i,label) in test_data]
+        else:
+            derived = [classifier.classify(features(i,vocab)) for (i,label) in test_data]
         cm = nltk.ConfusionMatrix(gold,derived)
         print(cm)
         #return cm
     if metrics:
         gold = [label for (i, label) in test_data]
-        derived = [classifier.classify(features(i,vocab)) for (i,label) in test_data]
+        derived = None
+        if ngrams:
+            derived = [classifier.classify(features(N_gram(i.context),vocab)) for (i,label) in test_data]
+        else:
+            derived = [classifier.classify(features(i,vocab)) for (i,label) in test_data]
+        #derived = [classifier.classify(features(i,vocab)) for (i,label) in test_data]
         results = {}
+
         w_acc = acc
+
+        mean_p = 0.0
+        mean_r = 0.0
+        mean_f1 = 0.0
+
         for i in senses:
             p = precision(gold, derived, i)
             r = recall(gold, derived, i)
             acc = accuracy_per_label(gold, derived, i)
             f1 = f1_score(p, r)
+            mean_p += p
+            mean_r += r
+            mean_f1 += f1
             print(i, " Precision: ", p, " Recall: ", r, " Accuracy: ", acc, " F1-score: ", f1)
             #print(i, " Precision: %6.4f Recall: %6.4f Accuracy: %6.4f F1-score: %6.4f"%p,r,acc,f1)
             
             #added results dict that returns from the function
+
             results[i] = {"precision":p,"recall": r,"accuracy": acc,"f1": f1, "w_acc": w_acc}
+
+        print("MEAN_PRECISION: ", mean_p / len(senses), "MEAN_RECALL: ", mean_r / len(senses), "MEAN_F1: ", mean_f1 / len(senses))
+
         return results
 
 if __name__ == "__main__":
+    word = 'serve.pos'
     print("NB, with features based on 300 most frequent context words")
-    project_classifier(NaiveBayesClassifier.train, 'hard.pos', wsd_word_features, confusion_matrix=True, metrics=True)
+    project_classifier(NaiveBayesClassifier.train, word, gram_word_features, confusion_matrix=True, metrics=True, vocab_f=extract_vocab_grams, ngrams=True)
+    project_classifier(NaiveBayesClassifier.train, word, wsd_word_features, confusion_matrix=True, metrics=True)
     print("")
+    exit()
     print("NB, with features based word + pos in 6 word window")
-    project_classifier(NaiveBayesClassifier.train, 'hard.pos', wsd_context_features,confusion_matrix=True, metrics=True)
+    project_classifier(NaiveBayesClassifier.train, word, wsd_context_features,confusion_matrix=True, metrics=True)
     print("")
-
+    print("NB, with features based tf_idf")
+    project_classifier(NaiveBayesClassifier.train, word, wsd_tfidf_features,confusion_matrix=True, metrics=True, vocab_f=extract_vocab_frequency)
+    print("")
+    
     svc = LinearSVC()
     print("SVC, with features based on 300 most frequent context words")
-    project_classifier(SklearnClassifier(svc).train, 'hard.pos', wsd_word_features, confusion_matrix=True, metrics=True)
+    project_classifier(SklearnClassifier(svc).train, word, wsd_word_features, confusion_matrix=True, metrics=True, vocab_f=extract_vocab_grams, ngrams=True)
     print("")
+    project_classifier(SklearnClassifier(svc).train, word, wsd_word_features, confusion_matrix=True, metrics=True)
     print("SVC, with features based word + pos in 6 word window")
-    project_classifier(SklearnClassifier(svc).train, 'hard.pos', wsd_context_features, confusion_matrix=True, metrics=True)
+    project_classifier(SklearnClassifier(svc).train, word, wsd_context_features, confusion_matrix=True, metrics=True)
     print("")
-
+    print("SVC, with features based on tfidf")
+    project_classifier(SklearnClassifier(svc).train, word, wsd_tfidf_features, confusion_matrix=True, metrics=True, vocab_f=extract_vocab_frequency)
+    """
     rfc = RandomForestClassifier()
     print("RandomForest, with features based on 300 most frequent context words")
-    project_classifier(SklearnClassifier(rfc).train, 'hard.pos', wsd_word_features, confusion_matrix=True, metrics=True)
+    project_classifier(SklearnClassifier(rfc).train, word, wsd_word_features, confusion_matrix=True, metrics=True)
     print("")
     print("RandomForest, with features based word + pos in 6 word window")
-    project_classifier(SklearnClassifier(rfc).train, 'hard.pos', wsd_context_features, confusion_matrix=True, metrics=True)
+    project_classifier(SklearnClassifier(rfc).train, word, wsd_context_features, confusion_matrix=True, metrics=True)
     print("")
 
     dtc = DecisionTreeClassifier()
     print("DecisionTree, with features based on 300 most frequent context words")
-    project_classifier(SklearnClassifier(dtc).train, 'hard.pos', wsd_word_features, confusion_matrix=True, metrics=True)
+    project_classifier(SklearnClassifier(dtc).train, word, wsd_word_features, confusion_matrix=True, metrics=True)
     print("")
     print("DecisionTree, with features based word + pos in 6 word window")
-    project_classifier(SklearnClassifier(dtc).train, 'hard.pos', wsd_context_features, confusion_matrix=True, metrics=True)
+    project_classifier(SklearnClassifier(dtc).train, word, wsd_context_features, confusion_matrix=True, metrics=True)
     print("")
+    """
