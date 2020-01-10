@@ -205,6 +205,7 @@ def gen_graph(data, name):
 def gen_classifier_graphs(word, trainers_and_features):
   results_standard = senseval_lesk(word, standard_lesk, NO_STOPWORDS, metrics=True)
   results_extended = senseval_lesk(word, extended_lesk, NO_STOPWORDS, metrics=True)
+  results_extended_examples = senseval_lesk(word, extended_lesk, NO_STOPWORDS, metrics=True, use_examples=True)
   results = {}
 
   for index, name in enumerate(trainers_and_features):
@@ -213,8 +214,9 @@ def gen_classifier_graphs(word, trainers_and_features):
   
   
 
-  results["Lesk"] = results_standard
-  results["lesk_ex"] = results_extended
+  results["s_lesk"] = results_standard
+  results["e_lesk"] = results_extended
+  results["e_lesk_ex"] = results_extended_examples
   inverted_results = gen_word_dicts(results)
 
   avg_data = gen_average_table_data_without_delta(results, word)
@@ -355,5 +357,5 @@ if __name__ == "__main__":
     }
 
   #Takes a while.
-  gen_graphs(word, trainers_and_features, avg_only=True)
-  #gen_classifier_graphs(word, trainers_and_features)
+  #gen_graphs(word, trainers_and_features, avg_only=True)
+  gen_classifier_graphs(word, trainers_and_features)
